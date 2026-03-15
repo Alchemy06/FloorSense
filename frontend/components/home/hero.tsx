@@ -106,7 +106,7 @@ export function Hero() {
                   <Plus className="w-5 h-5" />
                 </button>
                 <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-3 py-2 bg-foreground text-background text-sm font-medium rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
-                  {uploadedFile ? uploadedFile.name : "Upload floor plan"}
+                  Upload floor plan
                   <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-foreground" />
                 </div>
               </div>
