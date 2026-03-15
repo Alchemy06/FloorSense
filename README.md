@@ -1,4 +1,4 @@
-# 🥭🥭🥭🥭 THE MANGO TEAM: 🥭🥭🥭🥭
+# 🥭🥭🥭🥭 THE MANGO TEAM 🥭🥭🥭🥭
 
        The Tactical Real Estate Engine
 **A Gamified Approach to Property Safety | Built by The Mangos**
