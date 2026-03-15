@@ -145,7 +145,8 @@ export default function AnalysisReviewPage() {
 
         // Call backend API to generate audio with ElevenLabs (lazy-load only on play)
         console.log('🎤 Requesting ElevenLabs audio generation...')
-        const response = await fetch('/api/submit/text-to-speech', {
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
+        const response = await fetch(`${backendUrl}/api/submit/text-to-speech`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ narrative: narrative }),

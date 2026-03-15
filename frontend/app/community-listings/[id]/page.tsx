@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { useParams } from "next/navigation"
 import { Header } from "@/components/home/header"
 import { Footer } from "@/components/home/footer"
-import { MapPin, ArrowLeft, ChevronDown, Play, Pause, Loader } from "lucide-react"
+import { MapPin, ArrowLeft, ChevronDown, Play, Pause, Loader, RotateCcw, Square } from "lucide-react"
 import Link from "next/link"
 import { fetchFloorPlanById } from "@/lib/api"
 
@@ -25,6 +25,7 @@ interface FloorPlanDetail {
     sightlineScore: number
     dominantVantagePoints: (string | { name: string; reasoning: string })[]
     combatSummary: string
+    gameifiedNarrative?: string
   }
   submittedBy?: string
   submittedAt: string
@@ -40,6 +41,9 @@ export default function ListingDetail() {
   const [expandedReport, setExpandedReport] = useState(false)
   const [audioStatus, setAudioStatus] = useState<'idle' | 'loading' | 'ready' | 'playing'>('idle')
   const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null)
+  const [currentTime, setCurrentTime] = useState(0)
+  const [duration, setDuration] = useState(0)
+  const [narrativeText, setNarrativeText] = useState<string>('')
 
   useEffect(() => {
     const fetchFloorPlan = async () => {
@@ -97,16 +101,34 @@ export default function ListingDetail() {
   }
 
   const generateNarrative = (): string => {
-    const ta = floorPlan.tacticalAnalysis
+    // Use stored gameifiedNarrative if available, otherwise fall back to generated one
+    if (floorPlan?.tacticalAnalysis?.gameifiedNarrative) {
+      return floorPlan.tacticalAnalysis.gameifiedNarrative
+    }
+    
+    const ta = floorPlan!.tacticalAnalysis
+    const defensiblePositionsText = ta.defensiblePositions
+      .map(pos => typeof pos === 'string' ? pos : pos.name)
+      .join(", ")
+    const keyLootZonesText = ta.keyLootZones
+      .map(zone => typeof zone === 'string' ? zone : zone.name)
+      .join(", ")
+    const highRiskZonesText = ta.highRiskZones
+      .map(zone => typeof zone === 'string' ? zone : zone.name)
+      .join(", ")
+    const dominantVantagePointsText = ta.dominantVantagePoints
+      .map(point => typeof point === 'string' ? point : point.name)
+      .join(", ")
+    
     return `Welcome to the tactical analysis of ${floorPlan.address}. This property has received an overall defense grade of ${ta.overallDefenseGrade}. Let me walk you through the key findings.
 
-Starting with Choke Points, this property scored ${ta.chokePointScore} out of 100. Defensible positions include: ${ta.defensiblePositions.join(", ")}.
+Starting with Choke Points, this property scored ${ta.chokePointScore} out of 100. Defensible positions include: ${defensiblePositionsText}.
 
-Next, Loot Spawns scored ${ta.lootSpawnScore} out of 100. Key loot zones are located at: ${ta.keyLootZones.join(", ")}.
+Next, Loot Spawns scored ${ta.lootSpawnScore} out of 100. Key loot zones are located at: ${keyLootZonesText}.
 
-Flank Vulnerability received a score of ${ta.flankVulnerabilityScore} out of 100. High risk zones include: ${ta.highRiskZones.join(", ")}.
+Flank Vulnerability received a score of ${ta.flankVulnerabilityScore} out of 100. High risk zones include: ${highRiskZonesText}.
 
-Finally, Sightline Analysis scored ${ta.sightlineScore} out of 100. Dominant vantage points are: ${ta.dominantVantagePoints.join(", ")}.
+Finally, Sightline Analysis scored ${ta.sightlineScore} out of 100. Dominant vantage points are: ${dominantVantagePointsText}.
 
 In summary: ${ta.combatSummary}`
   }
@@ -127,27 +149,102 @@ In summary: ${ta.combatSummary}`
     if (audioStatus === 'idle') {
       setAudioStatus('loading')
       try {
-        // TODO: Call ElevenLabs API through your backend
-        // const response = await fetch('/api/text-to-speech', {
-        //   method: 'POST',
-        //   headers: { 'Content-Type': 'application/json' },
-        //   body: JSON.stringify({ text: generateNarrative() })
-        // })
-        // const audioData = await response.blob()
-        // const url = URL.createObjectURL(audioData)
-        // setAudioUrl(url)
+        const narrative = generateNarrative()
+        setNarrativeText(narrative)
 
-        // For now, simulate a delay and show ready state
-        await new Promise(resolve => setTimeout(resolve, 2000))
-        const audio = new Audio()
-        // In production, set audio.src = url
+        // Call backend API to generate audio with ElevenLabs (lazy-load only on play)
+        console.log('🎤 Requesting ElevenLabs audio generation...')
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
+        const response = await fetch(`${backendUrl}/api/submit/text-to-speech`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ narrative: narrative }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          const errorMsg = errorData.details || errorData.error || response.statusText
+          console.error('Audio generation error response:', errorData)
+          throw new Error(`Audio generation failed: ${errorMsg}`)
+        }
+
+        const data = await response.json()
+        const audioDataUrl = data.audio
+
+        if (!audioDataUrl) {
+          console.error('❌ No audio data in response:', data)
+          throw new Error('No audio data received from server')
+        }
+
+        console.log('🎵 Audio data received, length:', audioDataUrl.length)
+        console.log('🎵 Audio data preview:', audioDataUrl.substring(0, 50) + '...')
+
+        // Create audio element with the generated audio
+        const audio = new Audio(audioDataUrl)
+
+        // Set up event listeners for tracking playback
+        audio.addEventListener('timeupdate', () => {
+          setCurrentTime(audio.currentTime)
+        })
+
+        audio.addEventListener('loadedmetadata', () => {
+          console.log('🎵 Audio metadata loaded, duration:', audio.duration)
+          setDuration(audio.duration)
+        })
+
+        audio.addEventListener('ended', () => {
+          console.log('🎵 Audio playback finished')
+          setAudioStatus('ready')
+          setCurrentTime(0)
+        })
+
+        audio.addEventListener('error', (e) => {
+          console.error('❌ Audio playback error event:', {
+            error: e,
+            errorCode: audio.error?.code,
+            errorMessage: audio.error?.message,
+            src: audio.src.substring(0, 100),
+          })
+          setAudioStatus('idle')
+          alert(`Audio playback failed: ${audio.error?.message || 'Unknown error'}`)
+        })
+
+        console.log('🎵 Audio element created, attempting to play...')
         setAudioElement(audio)
-        setAudioStatus('ready')
+        await audio.play()
+        console.log('🎵 Audio playback started')
+        setAudioStatus('playing')
       } catch (error) {
-        console.error('Failed to generate audio:', error)
+        console.error('❌ Failed to generate audio:', {
+          message: error instanceof Error ? error.message : String(error),
+          error: error,
+        })
         setAudioStatus('idle')
+        alert(error instanceof Error ? error.message : 'Failed to generate audio. Please try again.')
       }
     }
+  }
+
+  const handleStopAudio = () => {
+    if (audioElement) {
+      audioElement.pause()
+      audioElement.currentTime = 0
+      setCurrentTime(0)
+      setAudioStatus('idle')
+    }
+  }
+
+  const handleRewind = () => {
+    if (audioElement) {
+      audioElement.currentTime = Math.max(0, audioElement.currentTime - 10)
+    }
+  }
+
+  const formatTime = (seconds: number): string => {
+    if (isNaN(seconds)) return '0:00'
+    const mins = Math.floor(seconds / 60)
+    const secs = Math.floor(seconds % 60)
+    return `${mins}:${secs.toString().padStart(2, '0')}`
   }
 
   return (
@@ -250,24 +347,52 @@ In summary: ${ta.combatSummary}`
                   </p>
 
                   {/* Audio Player */}
-                  <div className="flex items-center gap-4 p-4 bg-primary/5 rounded-lg border border-primary/20">
-                    {/* Play/Pause Button */}
-                    <button
-                      onClick={handlePlayAudio}
-                      disabled={audioStatus === 'loading'}
-                      className="flex-shrink-0 w-14 h-14 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
-                    >
-                      {audioStatus === 'loading' ? (
-                        <Loader className="w-6 h-6 animate-spin" />
-                      ) : audioStatus === 'playing' ? (
-                        <Pause className="w-6 h-6" />
-                      ) : (
-                        <Play className="w-6 h-6" />
-                      )}
-                    </button>
+                  <div className="space-y-4 p-4 bg-primary/5 rounded-lg border border-primary/20">
+                    {/* Control Buttons */}
+                    <div className="flex items-center gap-2">
+                      {/* Rewind Button */}
+                      <button
+                        onClick={handleRewind}
+                        disabled={audioStatus === 'idle' || audioStatus === 'loading'}
+                        className="flex-shrink-0 w-10 h-10 rounded-full bg-muted hover:bg-muted/80 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center text-foreground"
+                        title="Rewind 10 seconds"
+                      >
+                        <RotateCcw className="w-4 h-4" />
+                      </button>
+
+                      {/* Play/Pause Button */}
+                      <button
+                        onClick={handlePlayAudio}
+                        disabled={audioStatus === 'loading'}
+                        className="flex-shrink-0 w-14 h-14 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
+                      >
+                        {audioStatus === 'loading' ? (
+                          <Loader className="w-6 h-6 animate-spin" />
+                        ) : audioStatus === 'playing' ? (
+                          <Pause className="w-6 h-6" />
+                        ) : (
+                          <Play className="w-6 h-6" />
+                        )}
+                      </button>
+
+                      {/* Stop Button */}
+                      <button
+                        onClick={handleStopAudio}
+                        disabled={audioStatus === 'idle' || audioStatus === 'loading'}
+                        className="flex-shrink-0 w-10 h-10 rounded-full bg-muted hover:bg-muted/80 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center text-foreground"
+                        title="Stop playback"
+                      >
+                        <Square className="w-4 h-4 fill-current" />
+                      </button>
+
+                      {/* Time Display */}
+                      <div className="ml-auto text-sm text-muted-foreground font-mono">
+                        {formatTime(currentTime)} / {formatTime(duration)}
+                      </div>
+                    </div>
 
                     {/* Status Text */}
-                    <div className="flex-1">
+                    <div>
                       {audioStatus === 'idle' && (
                         <p className="text-sm text-muted-foreground">
                           Click play to generate and listen to the audio briefing
