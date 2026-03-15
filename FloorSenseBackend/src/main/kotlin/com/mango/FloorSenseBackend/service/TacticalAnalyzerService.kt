@@ -16,61 +16,84 @@ import java.util.Base64
 @Service
 class TacticalAnalyzerService(
     private val floorPlanRepository: FloorPlanRepository,
-    @Value("\${spring.ai.google.genai.api-key}") private val apiKey: String
+    @Value("\${claude.api-key}") private val apiKey: String
 ) {
     private val httpClient = HttpClient.newHttpClient()
     private val objectMapper = ObjectMapper()
 
-    private val tacticalPrompt = """
-        You are a tactical architect for a high-stakes competitive shooter like Rainbow Six Siege.
-        Analyze this floor plan image based on these metrics:
-        1. Choke Points: Hallway control and cover density.
-        2. Loot Spawns: Resource clustering and accessibility.
-        3. Flank Vulnerability: Sightline exposure and open concept.
-        4. Sightline Analysis: Vantage points and intersection control.
+    private val analysisPrompt = """
+        You are analyzing a floor plan image of a property like a competitive gaming map. Provide a comprehensive tactical analysis with detailed reasoning for each metric.
 
-        Return ONLY a raw JSON object with no markdown and no backticks with this structure:
+        Return ONLY valid JSON (no markdown, no extra text):
         {
-          "overallDefenseGrade": "S/A/B/C/D/F",
-          "chokePointScore": 0,
-          "defensiblePositions": ["name1", "name2"],
-          "lootSpawnScore": 0,
-          "keyLootZones": ["zone1", "zone2"],
-          "flankVulnerabilityScore": 0,
-          "highRiskZones": ["risk1", "risk2"],
-          "sightlineScore": 0,
-          "dominantVantagePoints": ["point1"],
-          "combatSummary": "Brief summary text."
+          "overallDefenseGrade": "A+/A/B+/B/C+/C/D/F",
+          "overallDefenseReasoning": "Detailed explanation of why this property received this grade",
+          "chokePointScore": 75,
+          "chokePointExplanation": "Detailed explanation of chokepoint effectiveness",
+          "defensiblePositions": [
+            { "name": "Living Room", "reasoning": "Why this is defensible" }
+          ],
+          "lootSpawnScore": 82,
+          "lootSpawnExplanation": "Detailed explanation of valuable asset zones",
+          "keyLootZones": [
+            { "name": "Kitchen", "reasoning": "Why this is valuable" }
+          ],
+          "flankVulnerabilityScore": 45,
+          "flankExplanation": "Detailed explanation of flank vulnerabilities",
+          "highRiskZones": [
+            { "name": "Windows facing street", "reasoning": "Why this is high-risk" }
+          ],
+          "sightlineScore": 88,
+          "sightlineExplanation": "Detailed explanation of surveillance potential",
+          "dominantVantagePoints": [
+            { "name": "Master Bedroom window", "reasoning": "Why this provides dominant control" }
+          ],
+          "combatSummary": "4-5 sentence comprehensive assessment of the property's tactical value",
+          "gameifiedNarrative": "An engaging 2-3 minute audio briefing script (400-600 words) written in a compelling narrative style for gaming/tactical enthusiasts."
         }
+
+        Analyze the floor plan and provide scores 0-100 for each metric. Include detailed tactical reasoning for every point.
     """.trimIndent()
 
     fun analyzeFloorPlan(plan: FloorPlan, imageBytes: ByteArray): FloorPlan {
         val base64Image = Base64.getEncoder().encodeToString(imageBytes)
 
         val requestBody = objectMapper.writeValueAsString(mapOf(
-            "contents" to listOf(mapOf(
-                "parts" to listOf(
-                    mapOf("text" to tacticalPrompt),
-                    mapOf("inline_data" to mapOf(
-                        "mime_type" to "image/jpeg",
-                        "data" to base64Image
-                    ))
+            "model" to "claude-sonnet-4-20250514",
+            "max_tokens" to 4000,
+            "messages" to listOf(mapOf(
+                "role" to "user",
+                "content" to listOf(
+                    mapOf(
+                        "type" to "image",
+                        "source" to mapOf(
+                            "type" to "base64",
+                            "media_type" to "image/jpeg",
+                            "data" to base64Image
+                        )
+                    ),
+                    mapOf(
+                        "type" to "text",
+                        "text" to analysisPrompt
+                    )
                 )
             ))
         ))
 
         val request = HttpRequest.newBuilder()
-            .uri(URI.create("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$apiKey"))
+            .uri(URI.create("https://api.anthropic.com/v1/messages"))
             .header("Content-Type", "application/json")
+            .header("x-api-key", apiKey)
+            .header("anthropic-version", "2023-06-01")
             .POST(HttpRequest.BodyPublishers.ofString(requestBody))
             .build()
 
         val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
         val responseBody = objectMapper.readTree(response.body())
 
-        val text = responseBody.get("candidates")?.get(0)?.get("content")?.get("parts")?.get(0)?.get("text")?.asText()
+        val text = responseBody.get("content")?.get(0)?.get("text")?.asText()
             ?.replace("```json", "")?.replace("```", "")?.trim()
-            ?: throw Exception("Gemini response empty")
+            ?: throw Exception("Claude response empty")
 
         val analysis = objectMapper.readValue(text, TacticalAnalysis::class.java)
         plan.tacticalAnalysis = analysis
@@ -86,43 +109,11 @@ class TacticalAnalyzerService(
         for (plan in pendingPlans) {
             try {
                 val imageBytes = UrlResource(plan.floorplanUrl).inputStream.readBytes()
-                val base64Image = Base64.getEncoder().encodeToString(imageBytes)
-
-                val requestBody = objectMapper.writeValueAsString(mapOf(
-                    "contents" to listOf(mapOf(
-                        "parts" to listOf(
-                            mapOf("text" to tacticalPrompt),
-                            mapOf("inline_data" to mapOf(
-                                "mime_type" to "image/jpeg",
-                                "data" to base64Image
-                            ))
-                        )
-                    ))
-                ))
-
-                val request = HttpRequest.newBuilder()
-                    .uri(URI.create("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + apiKey))
-                    .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(requestBody))
-                    .build()
-
-                val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
-                val responseBody = objectMapper.readTree(response.body())
-
-                val text = responseBody.get("candidates")?.get(0)?.get("content")?.get("parts")?.get(0)?.get("text")?.asText()
-                    ?.replace("```json", "")?.replace("```", "")?.trim()
-                    ?: throw Exception("Gemini response empty")
-
-                val analysis = objectMapper.readValue(text, TacticalAnalysis::class.java)
-                plan.tacticalAnalysis = analysis
-                plan.status = "analyzed"
-
-                floorPlanRepository.save(plan)
+                analyzeFloorPlan(plan, imageBytes)
                 analyzedCount++
-                println("Analysis Complete for: " + plan.address)
-
+                println("Analysis Complete for: ${plan.address}")
             } catch (e: Exception) {
-                println("Analysis Failed for: " + plan.address + " Error: " + e.message)
+                println("Analysis Failed for: ${plan.address} Error: ${e.message}")
             }
         }
         return analyzedCount

@@ -1,6 +1,5 @@
 package com.mango.FloorSenseBackend.service
 
-
 import com.mango.FloorSenseBackend.dto.PlaywrightResponse
 import com.mango.FloorSenseBackend.model.FloorPlan
 import com.mango.FloorSenseBackend.repository.FloorPlanRepository
@@ -11,8 +10,7 @@ import org.springframework.web.client.RestClient
 class RightmoveScraperService(private val floorPlanRepository: FloorPlanRepository) {
     private val restClient = RestClient.create()
 
-    fun scrapeAndStore(rightmoveUrl: String): FloorPlan? {
-        // Points to the other container in docker-compose
+    fun scrapeAndStore(rightmoveUrl: String, submittedBy: String = "Anonymous"): FloorPlan? {
         val url = "http://playwright-mcp:3000/get-floorplan"
 
         return try {
@@ -23,7 +21,7 @@ class RightmoveScraperService(private val floorPlanRepository: FloorPlanReposito
                 .body(PlaywrightResponse::class.java)
 
             if (response?.success == true) {
-                floorPlanRepository.save(response.data.toEntity())
+                floorPlanRepository.save(response.data.toEntity(submittedBy))
             } else null
         } catch (e: Exception) {
             println("Scrape failed: ${e.message}")

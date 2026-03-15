@@ -6,12 +6,9 @@ spring:
     mongodb:
       uri: mongodb+srv://admin:adit@cluster0.uyv5apx.mongodb.net/floorsense
 
-  ai:
-    google:
-      genai:
-        api-key: AIzaSyAT1cwSAQ65sCNer75gRuJmI3AOGEiX5v8
-        project-id: floorsense
-        location: us-central1
-        chat:
-          options:
-            model: gemini-2.0-flash
+claude:
+  api-key: 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
+
+elevenlabs:
+  api-key: sk_86dd19bef4a0acc056408d27581b7529ddd90f45e81f8878
+  voice-id: wBXNqKUATyqu0RtYt25i
