@@ -22,7 +22,7 @@ Paste a Rightmove link, and our model analyse the floor plan automatically, scor
 
 ## The Tech Stack
 * **Frontend:** React, TypeScript (Fast, type-safe web UI).
-* **Backend:** Node.js, Express (API routing and Playwright data scraping).
+* **Backend:** Node.js, Kotlin.
 * **AI Brain:** Anthropic Claude (Vision analysis of floor plan layouts).
 * **Voice Engine:** ElevenLabs API (Text-to-speech mission briefings).
 * **Database:** MongoDB Atlas (Storing property dossiers and tactical stats).
