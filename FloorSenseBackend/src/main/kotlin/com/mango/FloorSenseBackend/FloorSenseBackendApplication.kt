@@ -7,5 +7,5 @@ import org.springframework.boot.runApplication
 class FloorSenseBackendApplication
 
 fun main(args: Array<String>) {
-	runApplication<FloorSenseBackendApplication>(*args)
+    runApplication<FloorSenseBackendApplication>(*args)
 }

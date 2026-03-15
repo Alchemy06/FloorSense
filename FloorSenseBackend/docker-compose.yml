@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./FloorSenseBackend
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_DATA_MONGODB_URI=mongodb+srv://admin:adit@cluster0.uyv5apx.mongodb.net/floorsense
+      - SPRING_AI_GOOGLE_GENAI_API_KEY=AIzaSyAT1cwSAQ65sCNer75gRuJmI3AOGEiX5v8
+    depends_on:
+      - playwright-mcp
+    networks:
+      - floorsense-network
+
+  playwright-mcp:
+    build: ./playwright-mcp
+    ports:
+      - "3000:3000"
+    networks:
+      - floorsense-network
+
+networks:
+  floorsense-network:
+    driver: bridge
