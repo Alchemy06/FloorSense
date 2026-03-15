@@ -1,3 +1,17 @@
 spring:
   application:
     name: FloorSenseBackend
+
+  data:
+    mongodb:
+      uri: mongodb+srv://admin:adit@cluster0.uyv5apx.mongodb.net/floorsense
+
+  ai:
+    google:
+      genai:
+        api-key: AIzaSyAT1cwSAQ65sCNer75gRuJmI3AOGEiX5v8
+        project-id: floorsense
+        location: us-central1
+        chat:
+          options:
+            model: gemini-2.0-flash
