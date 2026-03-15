@@ -4,7 +4,7 @@
 **A Gamified Approach to Property Safety | Built by The Mangos**
 
 [![Frontend](https://img.shields.io/badge/Frontend-React%20%7C%20TypeScript-blue)](#)
-[![Backend](https://img.shields.io/badge/Backend-Node.js%20%7C%20Kotlin-green](#)
+[![Backend](https://img.shields.io/badge/Backend-Node.js%20%7C%20Express-green](#)
 [![AI & Audio](https://img.shields.io/badge/AI-Claude%20%7C%20ElevenLabs-purple)](#)
 [![Infrastructure](https://img.shields.io/badge/Deploy-Docker%20%7C%20Vultr-orange)](#)
 
