@@ -1,147 +1,114 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useParams } from "next/navigation"
 import { Header } from "@/components/home/header"
 import { Footer } from "@/components/home/footer"
-import { MapPin, Home, ArrowLeft, Download, ChevronDown, Play, Pause, Loader } from "lucide-react"
+import { MapPin, ArrowLeft, ChevronDown, Play, Pause, Loader } from "lucide-react"
 import Link from "next/link"
+import { fetchFloorPlanById } from "@/lib/api"
 
-// Mock data - replace with API call later
-const mockListingDetails = {
-  id: "1",
-  title: "Modern City Center Apartment",
-  location: "London, UK",
-  type: "Apartment",
-  chokePoints: 8.5,
-  lootSpawns: 7.2,
-  flankVulnerability: 6.8,
-  sightlineAnalysis: 7.5,
-  overallScore: 7.5,
-  submittedBy: "John D.",
-  submittedAt: "2024-03-10",
-  floorPlanImage: "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=600&h=800&fit=crop",
-  description: "A stunning modern apartment in the heart of London with an open floor plan and excellent tactical positioning.",
-  analysisReport: `
-Executive Summary
-This modern apartment has been thoroughly analyzed for tactical advantages and vulnerabilities. The overall score of 7.5/10 reflects a well-balanced property with some notable strengths and areas for consideration.
-
-Choke Points (8.5/10)
-**Hallway Control**: Narrow corridor leading to main rooms provides good defensive positioning
-- Limited approach vectors from entrance
-- Strong cover available from kitchen counter
-- Single escape route requires planning
-
-**Cover Density**: Excellent - Multiple barriers and obstacles
-- Kitchen island for defensive positioning
-- Bedroom furniture arrangements
-- Living area couch placement
-
-**Multiple Exits**: Good - Multiple escape routes available
-- Primary exit through main hallway
-- Secondary exit through kitchen to balcony
-- Bedroom window emergency exit
-
-**Entry Points**: 3 primary entry vectors
-- Main entrance (primary)
-- Kitchen balcony door
-- Living room balcony access
-
-Loot Spawns (7.2/10)
-**Resource Clustering**: Moderately dense distribution
-- Kitchen contains primary resources
-- Bedroom has secondary loot locations
-- Bathroom supplies concentrated in one area
-
-**Accessibility**: Good reach without compromise
-- Most items within 5 meters of movement
-- Counter height optimal for gathering
-- Storage areas well-positioned
-
-**Storage Capacity**: Strong total volume
-- Multiple built-in wardrobes
-- Kitchen cabinets and drawers
-- Living area shelving
-
-**Defense Rating**: Moderate protection
-- Some cover while gathering in kitchen
-- Exposed during bathroom supply acquisition
-- Living area exposed to multiple angles
-
-Flank Vulnerability (6.8/10)
-**Sightline Exposure**: Moderate exposure
-- Living room windows visible from opposite buildings
-- Balcony doors provide exterior visibility
-- Interior sightlines somewhat contained
-
-**Blind Entry Routes**: Limited options
-- Main entrance is primary approach
-- Kitchen balcony provides secondary access
-- Limited concealed approaches
-
-**Open Concept Layout**: Partially open
-- Living area and kitchen connected
-- Bedroom isolated
-- Bathroom completely separated
-
-**Cover Scarcity**: Moderate
-- Living area lacks defensive positions
-- Kitchen provides good cover
-- Bedroom adequately protected
-
-Sightline Analysis (7.5/10)
-**Vantage Points**: Strong positioning available
-- Kitchen counter provides high vantage point
-- Balcony offers external perspective
-- Bedroom window secure observation
-
-**Coverage Area**: Good visibility throughout
-- 70% of property visible from main areas
-- Blind spots limited to small corners
-- Mirror placement enhances coverage
-
-**Blind Spots**: Few problematic areas
-- Small corner behind bedroom door
-- Area under kitchen table
-- Closet interiors
-
-**Intersection Control**: Good junction control
-- Central hallway controls all movement
-- Kitchen access point critical
-- Multiple crossing points manageable
-
-Key Recommendations
-
-1. **Strengthen Hallway Defense**: Add furniture blocking to reduce approach angles
-2. **Enhance Window Security**: Consider mirror placement for exterior monitoring
-3. **Optimize Resource Routes**: Create efficient gathering paths through kitchen
-4. **Secondary Position**: Develop bedroom as secondary defensive position
-5. **Communication Points**: Establish sight lines between key areas
-
-Final Assessment
-
-This modern apartment presents a well-rounded tactical environment with good defensive positioning opportunities and moderate resource distribution. The open floor plan provides visibility advantages while the segmented bedroom and bathroom offer retreat options. Recommended for tactical analysis: High priority.
-  `
+interface FloorPlanDetail {
+  _id: string
+  address: string
+  primaryPrice?: string
+  description?: string
+  floorplanUrl: string
+  tacticalAnalysis: {
+    overallDefenseGrade: string
+    chokePointScore: number
+    defensiblePositions: (string | { name: string; reasoning: string })[]
+    lootSpawnScore: number
+    keyLootZones: (string | { name: string; reasoning: string })[]
+    flankVulnerabilityScore: number
+    highRiskZones: (string | { name: string; reasoning: string })[]
+    sightlineScore: number
+    dominantVantagePoints: (string | { name: string; reasoning: string })[]
+    combatSummary: string
+  }
+  submittedBy?: string
+  submittedAt: string
 }
 
-export default function ListingDetail({ params }: { params: { id: string } }) {
+export default function ListingDetail() {
+  const params = useParams()
+  const id = params.id as string
+  
+  const [floorPlan, setFloorPlan] = useState<FloorPlanDetail | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [expandedReport, setExpandedReport] = useState(false)
   const [audioStatus, setAudioStatus] = useState<'idle' | 'loading' | 'ready' | 'playing'>('idle')
-  const [audioUrl, setAudioUrl] = useState<string | null>(null)
   const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null)
-  const listing = mockListingDetails // In production, fetch based on params.id
+
+  useEffect(() => {
+    const fetchFloorPlan = async () => {
+      try {
+        setLoading(true)
+        const data = await fetchFloorPlanById(id)
+        setFloorPlan(data)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load floor plan")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (id) {
+      fetchFloorPlan()
+    }
+  }, [id])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex flex-col bg-background">
+        <Header />
+        <main className="flex-1 flex items-center justify-center">
+          <div className="flex flex-col items-center gap-4">
+            <Loader className="w-8 h-8 text-primary animate-spin" />
+            <p className="text-foreground">Loading floor plan...</p>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    )
+  }
+
+  if (error || !floorPlan) {
+    return (
+      <div className="min-h-screen flex flex-col bg-background">
+        <Header />
+        <main className="flex-1 flex items-center justify-center px-6">
+          <div className="text-center space-y-4 bg-destructive/10 border border-destructive/20 rounded-lg p-6">
+            <p className="text-lg text-destructive">Error loading floor plan</p>
+            <p className="text-sm text-foreground/60">{error}</p>
+            <Link
+              href="/community-listings"
+              className="inline-flex items-center gap-2 text-primary hover:text-primary/80 mt-4"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back to Listings
+            </Link>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    )
+  }
 
   const generateNarrative = (): string => {
-    return `Welcome to the tactical analysis of ${listing.title} located in ${listing.location}. This property has received an overall score of ${listing.overallScore} out of 10. Let me walk you through the key findings.
+    const ta = floorPlan.tacticalAnalysis
+    return `Welcome to the tactical analysis of ${floorPlan.address}. This property has received an overall defense grade of ${ta.overallDefenseGrade}. Let me walk you through the key findings.
 
-Starting with Choke Points, this property scored ${listing.chokePoints} out of 10. Choke points represent defensible positions and hallway control. The narrow corridor leading to main rooms provides good defensive positioning with limited approach vectors from the entrance.
+Starting with Choke Points, this property scored ${ta.chokePointScore} out of 100. Defensible positions include: ${ta.defensiblePositions.join(", ")}.
 
-Next, Loot Spawns scored ${listing.lootSpawns} out of 10. Resources are moderately distributed throughout the property. The kitchen contains the primary resources with secondary locations in the bedroom and bathroom.
+Next, Loot Spawns scored ${ta.lootSpawnScore} out of 100. Key loot zones are located at: ${ta.keyLootZones.join(", ")}.
 
-Flank Vulnerability received a score of ${listing.flankVulnerability} out of 10. This metric evaluates exposure and vulnerability to flanking attacks. The property has moderate exposure through windows and balcony doors, with limited blind entry routes.
+Flank Vulnerability received a score of ${ta.flankVulnerabilityScore} out of 100. High risk zones include: ${ta.highRiskZones.join(", ")}.
 
-Finally, Sightline Analysis scored ${listing.sightlineAnalysis} out of 10. Strong vantage points are available from the kitchen counter and balcony, providing good visibility throughout the property with the open floor plan.
+Finally, Sightline Analysis scored ${ta.sightlineScore} out of 100. Dominant vantage points are: ${ta.dominantVantagePoints.join(", ")}.
 
-In summary, this is a well-rounded tactical environment with good defensive positioning opportunities. The property balances visibility with cover, making it a recommendable location for tactical analysis.`
+In summary: ${ta.combatSummary}`
   }
 
   const handlePlayAudio = async () => {
@@ -206,17 +173,17 @@ In summary, this is a well-rounded tactical environment with good defensive posi
           <div className="max-w-7xl mx-auto">
             {/* Header Section */}
             <div className="space-y-4 mb-8">
-              <h1 className="text-4xl font-bold font-tomorrow text-foreground">{listing.title}</h1>
+              <h1 className="text-4xl font-bold font-tomorrow text-foreground">{floorPlan.address}</h1>
               <div className="flex flex-col sm:flex-row sm:items-center gap-4 text-muted-foreground">
-                <div className="flex items-center gap-2">
-                  <MapPin className="w-4 h-4" />
-                  <span>{listing.location}</span>
+                {floorPlan.primaryPrice && (
+                  <div className="text-lg font-semibold text-foreground">
+                    {floorPlan.primaryPrice}
+                  </div>
+                )}
+                <div>
+                  <span className="text-sm">Grade: {floorPlan.tacticalAnalysis.overallDefenseGrade}</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Home className="w-4 h-4" />
-                  <span>{listing.type}</span>
-                </div>
-                <span className="text-sm">Submitted by {listing.submittedBy} on {listing.submittedAt}</span>
+                <span className="text-sm">Submitted by {floorPlan.submittedBy || 'Anonymous'} on {new Date(floorPlan.submittedAt).toLocaleDateString()}</span>
               </div>
             </div>
 
@@ -225,17 +192,22 @@ In summary, this is a well-rounded tactical environment with good defensive posi
               {/* Floor Plan - Sticky on Desktop */}
               <div className="lg:col-span-1">
                 <div className="lg:sticky lg:top-24 space-y-4">
-                  <div className="aspect-square rounded-xl overflow-hidden border border-border">
-                    <img
-                      src={listing.floorPlanImage}
-                      alt="Floor Plan"
-                      className="w-full h-full object-cover"
-                    />
+                  <div className="aspect-square rounded-xl overflow-hidden border border-border bg-muted">
+                    {floorPlan.floorplanUrl ? (
+                      <img
+                        src={floorPlan.floorplanUrl}
+                        alt="Floor Plan"
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect fill='%23999' width='100' height='100'/%3E%3Ctext x='50' y='50' text-anchor='middle' dy='.3em' font-family='Arial' font-size='14' fill='white'%3EFloor Plan%3C/text%3E%3C/svg%3E"
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                        Floor plan image unavailable
+                      </div>
+                    )}
                   </div>
-                  <button className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors">
-                    <Download className="w-4 h-4" />
-                    Download Floor Plan
-                  </button>
                 </div>
               </div>
 
@@ -247,25 +219,25 @@ In summary, this is a well-rounded tactical environment with good defensive posi
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div className="space-y-2">
                       <p className="text-sm text-muted-foreground">Choke Points</p>
-                      <p className="text-3xl font-bold text-primary">{listing.chokePoints}</p>
+                      <p className="text-3xl font-bold text-primary">{floorPlan.tacticalAnalysis.chokePointScore}</p>
                     </div>
                     <div className="space-y-2">
                       <p className="text-sm text-muted-foreground">Loot Spawns</p>
-                      <p className="text-3xl font-bold text-primary">{listing.lootSpawns}</p>
+                      <p className="text-3xl font-bold text-primary">{floorPlan.tacticalAnalysis.lootSpawnScore}</p>
                     </div>
                     <div className="space-y-2">
                       <p className="text-sm text-muted-foreground">Flank Vulnerability</p>
-                      <p className="text-3xl font-bold text-primary">{listing.flankVulnerability}</p>
+                      <p className="text-3xl font-bold text-primary">{floorPlan.tacticalAnalysis.flankVulnerabilityScore}</p>
                     </div>
                     <div className="space-y-2">
                       <p className="text-sm text-muted-foreground">Sightline Analysis</p>
-                      <p className="text-3xl font-bold text-primary">{listing.sightlineAnalysis}</p>
+                      <p className="text-3xl font-bold text-primary">{floorPlan.tacticalAnalysis.sightlineScore}</p>
                     </div>
                   </div>
                   <div className="pt-4 border-t border-border/50">
-                    <p className="text-sm text-muted-foreground">Overall Score</p>
+                    <p className="text-sm text-muted-foreground">Overall Defense Grade</p>
                     <p className="text-5xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
-                      {listing.overallScore}/10
+                      {floorPlan.tacticalAnalysis.overallDefenseGrade}
                     </p>
                   </div>
                 </div>
@@ -321,18 +293,21 @@ In summary, this is a well-rounded tactical environment with good defensive posi
                 </div>
 
                 {/* Description */}
-                <div className="bg-card border border-border rounded-xl p-6">
-                  <p className="text-lg text-foreground">{listing.description}</p>
-                </div>
+                {floorPlan.description && (
+                  <div className="bg-card border border-border rounded-xl p-6">
+                    <h2 className="text-xl font-bold text-foreground mb-3">Description</h2>
+                    <p className="text-foreground">{floorPlan.description}</p>
+                  </div>
+                )}
 
-                {/* Analysis Report - Collapsible on Mobile */}
+                {/* Tactical Analysis Details - Collapsible on Mobile */}
                 <div className="bg-card border border-border rounded-xl p-6 space-y-4">
                   {/* Mobile Header - Collapsible */}
                   <button
                     onClick={() => setExpandedReport(!expandedReport)}
                     className="lg:hidden w-full flex items-center justify-between gap-2 text-left"
                   >
-                    <h2 className="text-2xl font-bold text-foreground">Full Analysis Report</h2>
+                    <h2 className="text-2xl font-bold text-foreground">Tactical Details</h2>
                     <ChevronDown
                       className={`w-6 h-6 text-foreground transition-transform ${
                         expandedReport ? 'rotate-180' : ''
@@ -341,7 +316,7 @@ In summary, this is a well-rounded tactical environment with good defensive posi
                   </button>
 
                   {/* Desktop Header - Always visible */}
-                  <h2 className="hidden lg:block text-2xl font-bold text-foreground">Full Analysis Report</h2>
+                  <h2 className="hidden lg:block text-2xl font-bold text-foreground">Tactical Details</h2>
 
                   {/* Report Content - Collapsible on Mobile, Always Visible on Desktop */}
                   <div
@@ -349,54 +324,56 @@ In summary, this is a well-rounded tactical environment with good defensive posi
                       expandedReport ? 'max-h-[70vh]' : 'max-h-0 lg:max-h-none'
                     }`}
                   >
-                    <div className="space-y-4">
-                      {listing.analysisReport.split('\n').map((paragraph, idx) => {
-                        if (paragraph.startsWith('##')) {
-                          return (
-                            <h2 key={idx} className="text-2xl font-bold text-foreground mt-6 mb-4">
-                              {paragraph.replace(/^##\s/, '')}
-                            </h2>
-                          )
-                        } else if (paragraph.startsWith('###')) {
-                          return (
-                            <h3 key={idx} className="text-xl font-bold text-foreground mt-4 mb-2">
-                              {paragraph.replace(/^###\s/, '')}
-                            </h3>
-                          )
-                        } else if (paragraph.startsWith('-')) {
-                          return (
-                            <ul key={idx} className="list-disc list-inside text-foreground ml-2">
-                              <li>{paragraph.replace(/^-\s/, '')}</li>
-                            </ul>
-                          )
-                        } else if (paragraph.startsWith('**') && paragraph.includes(':')) {
-                          const [bold, rest] = paragraph.split(':')
-                          return (
-                            <p key={idx} className="text-foreground">
-                              <strong>{bold.replace(/\*\*/g, '')}</strong>:{rest}
-                            </p>
-                          )
-                        } else if (
-                          paragraph.startsWith('1.') ||
-                          paragraph.startsWith('2.') ||
-                          paragraph.startsWith('3.') ||
-                          paragraph.startsWith('4.') ||
-                          paragraph.startsWith('5.')
-                        ) {
-                          return (
-                            <p key={idx} className="text-foreground ml-4">
-                              {paragraph}
-                            </p>
-                          )
-                        } else if (paragraph.trim()) {
-                          return (
-                            <p key={idx} className="text-foreground">
-                              {paragraph}
-                            </p>
-                          )
-                        }
-                        return null
-                      })}
+                    <div className="space-y-6">
+                      {/* Defensible Positions */}
+                      <div>
+                        <h3 className="text-lg font-bold text-foreground mb-2">Defensible Positions</h3>
+                        <ul className="list-disc list-inside space-y-1">
+                          {floorPlan.tacticalAnalysis.defensiblePositions.map((pos, idx) => {
+                            const name = typeof pos === 'string' ? pos : pos.name
+                            return <li key={idx} className="text-foreground">{name}</li>
+                          })}
+                        </ul>
+                      </div>
+
+                      {/* Key Loot Zones */}
+                      <div>
+                        <h3 className="text-lg font-bold text-foreground mb-2">Key Loot Zones</h3>
+                        <ul className="list-disc list-inside space-y-1">
+                          {floorPlan.tacticalAnalysis.keyLootZones.map((zone, idx) => {
+                            const name = typeof zone === 'string' ? zone : zone.name
+                            return <li key={idx} className="text-foreground">{name}</li>
+                          })}
+                        </ul>
+                      </div>
+
+                      {/* High Risk Zones */}
+                      <div>
+                        <h3 className="text-lg font-bold text-foreground mb-2">High Risk Zones</h3>
+                        <ul className="list-disc list-inside space-y-1">
+                          {floorPlan.tacticalAnalysis.highRiskZones.map((zone, idx) => {
+                            const name = typeof zone === 'string' ? zone : zone.name
+                            return <li key={idx} className="text-foreground">{name}</li>
+                          })}
+                        </ul>
+                      </div>
+
+                      {/* Dominant Vantage Points */}
+                      <div>
+                        <h3 className="text-lg font-bold text-foreground mb-2">Dominant Vantage Points</h3>
+                        <ul className="list-disc list-inside space-y-1">
+                          {floorPlan.tacticalAnalysis.dominantVantagePoints.map((point, idx) => {
+                            const name = typeof point === 'string' ? point : point.name
+                            return <li key={idx} className="text-foreground">{name}</li>
+                          })}
+                        </ul>
+                      </div>
+
+                      {/* Combat Summary */}
+                      <div>
+                        <h3 className="text-lg font-bold text-foreground mb-2">Combat Summary</h3>
+                        <p className="text-foreground">{floorPlan.tacticalAnalysis.combatSummary}</p>
+                      </div>
                     </div>
                   </div>
                 </div>

@@ -36,7 +36,7 @@ class AnalysisService(
         val response = restTemplate.postForObject(scraperUrl, request, ScraperResponse::class.java)
 
         if (response?.success != true || response.data == null) {
-            throw Exception("Scraper failed: ${response?.error}")
+            throw Exception("Scraper failed: ${'$'}{response?.error}")
         }
 
         val property = PropertyData(
@@ -55,6 +55,10 @@ class AnalysisService(
     // --- GEMINI HELPER ---
     private fun callGemini(floorplanUrl: String, prompt: String): String {
         val imageBytes = java.net.URL(floorplanUrl).readBytes()
+        return callGeminiWithBytes(imageBytes, prompt)
+    }
+
+    private fun callGeminiWithBytes(imageBytes: ByteArray, prompt: String): String {
         val base64Image = Base64.getEncoder().encodeToString(imageBytes)
 
         val requestBody = objectMapper.writeValueAsString(mapOf(
@@ -70,7 +74,7 @@ class AnalysisService(
         ))
 
         val request = HttpRequest.newBuilder()
-            .uri(URI.create("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$apiKey"))
+            .uri(URI.create("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}"))
             .header("Content-Type", "application/json")
             .POST(HttpRequest.BodyPublishers.ofString(requestBody))
             .build()
@@ -109,7 +113,8 @@ class AnalysisService(
         """.trimIndent()
 
         val analysis = objectMapper.readValue(callGemini(floorplanUrl, prompt), TacticalAnalysis::class.java)
-        val updated = property.copy(tacticalAnalysis = analysis)
+        val zestimate = computeTacticalZestimate(analysis)
+        val updated = property.copy(tacticalAnalysis = analysis, tacticalZestimate = zestimate, analyzedAt = Instant.now(), status = "complete")
         return propertyRepository.save(updated)
     }
 
@@ -133,7 +138,7 @@ class AnalysisService(
         """.trimIndent()
 
         val analysis = objectMapper.readValue(callGemini(floorplanUrl, prompt), NeuroAnalysis::class.java)
-        val updated = property.copy(neuroAnalysis = analysis)
+        val updated = property.copy(neuroAnalysis = analysis, analyzedAt = Instant.now(), status = "complete")
         return propertyRepository.save(updated)
     }
 
@@ -157,7 +162,67 @@ class AnalysisService(
         """.trimIndent()
 
         val analysis = objectMapper.readValue(callGemini(floorplanUrl, prompt), PropertyAnalysis::class.java)
-        val updated = property.copy(propertyAnalysis = analysis)
+        val updated = property.copy(propertyAnalysis = analysis, analyzedAt = Instant.now(), status = "complete")
         return propertyRepository.save(updated)
+    }
+
+    // --- NEW: Analyze uploaded image bytes ---
+    fun analyzeUploadedFloorplan(imageBytes: ByteArray): PropertyData {
+        // create a temporary PropertyData record to store results
+        val tempProperty = PropertyData(rightmoveUrl = "uploaded:${Instant.now()}", analyzedAt = Instant.now(), status = "processing")
+        val saved = propertyRepository.save(tempProperty)
+
+        val prompt = """
+            You are a multi-disciplinary property analyst. Analyze this floor plan image and return
+            JSON with tactical, neuro, and property analysis. Return ONLY raw JSON with keys: tactical, neuro, property
+        """.trimIndent()
+
+        val responseText = callGeminiWithBytes(imageBytes, prompt)
+
+        // Attempt to parse sections; best effort
+        val rootNode = try {
+            objectMapper.readTree(responseText)
+        } catch (e: Exception) {
+            // Try to read as tactical only
+            val tactical = try {
+                objectMapper.readValue(responseText, TacticalAnalysis::class.java)
+            } catch (ex: Exception) {
+                null
+            }
+            val updated = saved.copy(tacticalAnalysis = tactical, analyzedAt = Instant.now(), status = "complete")
+            return propertyRepository.save(updated)
+        }
+
+        val tactical = if (rootNode.has("tactical")) objectMapper.treeToValue(rootNode.get("tactical"), TacticalAnalysis::class.java) else null
+        val neuro = if (rootNode.has("neuro")) objectMapper.treeToValue(rootNode.get("neuro"), NeuroAnalysis::class.java) else null
+        val property = if (rootNode.has("property")) objectMapper.treeToValue(rootNode.get("property"), PropertyAnalysis::class.java) else null
+
+        val zestimate = tactical?.let { computeTacticalZestimate(it) }
+
+        val updated = saved.copy(
+            tacticalAnalysis = tactical,
+            neuroAnalysis = neuro,
+            propertyAnalysis = property,
+            tacticalZestimate = zestimate,
+            analyzedAt = Instant.now(),
+            status = "complete"
+        )
+        return propertyRepository.save(updated)
+    }
+
+    fun getAnalysisById(id: String): PropertyData? = propertyRepository.findById(id).orElse(null)
+
+    private fun computeTacticalZestimate(tactical: TacticalAnalysis): Double {
+        // Simple scoring: average of available numeric scores normalized to 0-10
+        val scores = listOfNotNull(
+            tactical.chokePointScore?.toDouble(),
+            tactical.lootSpawnScore?.toDouble(),
+            tactical.flankVulnerabilityScore?.toDouble()?.let { 100 - it }, // lower vulnerability -> higher score
+            tactical.sightlineScore?.toDouble()
+        )
+        if (scores.isEmpty()) return 0.0
+        val avg = scores.average()
+        // normalize 0-100 -> 0-10
+        return (avg / 10.0).coerceIn(0.0, 10.0)
     }
 }

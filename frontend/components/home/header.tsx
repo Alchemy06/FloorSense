@@ -2,17 +2,31 @@
 
 import { useState } from "react"
 import GameButton from "@/components/ui/game-button"
-import { Menu, X } from "lucide-react"
+import { GetStartedDialog } from "@/components/home/get-started-dialog"
+import { Menu, X, Zap } from "lucide-react"
 
 export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [getStartedOpen, setGetStartedOpen] = useState(false)
 
   return (
     <header className=" top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur-md supports-[backdrop-filter]:bg-background/60">
       <div className="max-w-7xl mx-auto flex h-16 items-center justify-between px-6">
         {/* Logo */}
-        <a href="/" className="flex-shrink-0">
-          <img src="/logo.png" alt="FloorSense" className="h-60 w-auto" />
+        <a href="/" className="flex-shrink-0 flex items-center gap-2.5 group">
+          {/* Logo Icon */}
+          <div className="relative w-10 h-10">
+            <div className="absolute inset-0 bg-gradient-to-br from-primary to-primary/70 rounded-lg transform group-hover:scale-110 transition-transform duration-300"></div>
+            <div className="absolute inset-1 bg-background rounded-md flex items-center justify-center">
+              <Zap className="w-5 h-5 text-primary font-bold" />
+            </div>
+          </div>
+          
+          {/* Logo Text */}
+          <div className="flex flex-col gap-0">
+            <span className="font-tomorrow font-bold text-base text-foreground leading-none group-hover:text-primary transition-colors">FloorSense</span>
+            <span className="text-xs text-primary font-semibold leading-none">TACTICAL</span>
+          </div>
         </a>
 
         {/* Navigation */}
@@ -53,12 +67,15 @@ export function Header() {
           
           {/* Desktop Button */}
           <div className="hidden sm:block">
-            <GameButton size="sm">
-              Get started
+            <GameButton size="sm" onClick={() => setGetStartedOpen(true)}>
+              Tips & Guides
             </GameButton>
           </div>
         </div>
       </div>
+
+      {/* Get Started Dialog */}
+      <GetStartedDialog open={getStartedOpen} onOpenChange={setGetStartedOpen} />
 
       {/* Mobile dropdown menu - appears on top without affecting page width */}
       {mobileMenuOpen && (
