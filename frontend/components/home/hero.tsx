@@ -1,20 +1,45 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
-import { Search, Send, Sparkles, Plus } from "lucide-react"
+import { Search, Send, Sparkles, Plus, Loader2 } from "lucide-react"
+import { submitRightmoveUrl, uploadFile, submitFloorPlanFile } from "@/lib/api"
 
 export function Hero() {
+  const router = useRouter()
   const [propertyUrl, setPropertyUrl] = useState("")
   const [isFocused, setIsFocused] = useState(false)
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
   const [pendingFile, setPendingFile] = useState<File | null>(null)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
+  const [fileAddress, setFileAddress] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
+  const [error, setError] = useState("")
 
-  const handleAnalyze = () => {
-    if (propertyUrl.trim()) {
-      console.log("Analyzing:", propertyUrl)
+  const handleAnalyze = async () => {
+    if (!propertyUrl.trim()) return
+    
+    setIsLoading(true)
+    setError("")
+    
+    try {
+      const result = await submitRightmoveUrl(propertyUrl, "Web User")
+      
+      // Clear form
+      setPropertyUrl("")
+      setIsLoading(false)
+      
+      // Redirect to analysis review page (not community listings)
+      setTimeout(() => {
+        router.push(`/analysis-review/${result.floorPlan._id}`)
+      }, 500)
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to analyze property"
+      setError(errorMessage)
+      setIsLoading(false)
     }
   }
 
@@ -26,25 +51,49 @@ export function Hero() {
     }
   }
 
-  const handleConfirmUpload = () => {
-    if (pendingFile) {
+  const handleConfirmUpload = async () => {
+    if (!pendingFile) return
+    
+    setIsUploading(true)
+    setError("")
+    
+    try {
+      // Step 1: Upload file to server
+      const uploadResult = await uploadFile(pendingFile)
+      const fileUrl = uploadResult.fileUrl || uploadResult.url
+      
+      // Step 2: Submit floor plan with address
+      if (!fileAddress.trim()) {
+        setError("Please enter a property address")
+        setIsUploading(false)
+        return
+      }
+      
+      const result = await submitFloorPlanFile(fileAddress, fileUrl, "Web User")
+      
+      // Clear form
       setUploadedFile(pendingFile)
-      console.log("File confirmed and stored:")
-      console.log("- Name:", pendingFile.name)
-      console.log("- Size:", pendingFile.size, "bytes")
-      console.log("- Type:", pendingFile.type)
-      console.log("- Full File Object:", pendingFile)
-      // TODO: Send to backend API here
-      // Example: await uploadFileToBackend(pendingFile)
+      setFileAddress("")
+      setShowConfirmDialog(false)
+      setPendingFile(null)
+      setIsUploading(false)
+      
+      // Redirect to analysis review page (not community listings)
+      setTimeout(() => {
+        router.push(`/analysis-review/${result.floorPlan._id}`)
+      }, 500)
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to upload floor plan"
+      setError(errorMessage)
+      setIsUploading(false)
     }
-    setShowConfirmDialog(false)
-    setPendingFile(null)
   }
 
   const handleDeclineUpload = () => {
-    console.log("File upload cancelled")
     setShowConfirmDialog(false)
     setPendingFile(null)
+    setFileAddress("")
+    setError("")
   }
 
   const triggerFileInput = () => {
@@ -123,20 +172,29 @@ export function Hero() {
               {/* Action button */}
               <button
                 onClick={handleAnalyze}
-                disabled={!propertyUrl.trim()}
-                className={`p-2.5 rounded-lg transition-all duration-300 flex-shrink-0 ${
-                  propertyUrl.trim()
+                disabled={!propertyUrl.trim() || isLoading}
+                className={`p-2.5 rounded-lg transition-all duration-300 flex-shrink-0 flex items-center justify-center ${
+                  propertyUrl.trim() && !isLoading
                     ? 'bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95 cursor-pointer'
                     : 'bg-muted text-muted-foreground cursor-not-allowed opacity-50'
                 }`}
               >
-                <Send className="w-5 h-5" />
+                {isLoading ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <Send className="w-5 h-5" />
+                )}
               </button>
             </div>
           </div>
 
           {/* Helper text with animation */}
           <div className="space-y-2">
+            {error && (
+              <p className="text-sm text-red-500 animate-fade-in">
+                ⚠️ {error}
+              </p>
+            )}
             <p className="text-sm text-muted-foreground animate-fade-in">
               Example: https://www.rightmove.co.uk/properties/165641261
             </p>
@@ -151,18 +209,36 @@ export function Hero() {
       <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Confirm File Upload</DialogTitle>
+            <DialogTitle>Upload Floor Plan</DialogTitle>
             <DialogDescription>
               {pendingFile && (
-                <div className="space-y-2">
-                  <p>You are about to upload:</p>
-                  <div className="bg-muted p-3 rounded-lg break-all">
-                    <p className="font-semibold text-foreground">{pendingFile.name}</p>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Size: {(pendingFile.size / 1024).toFixed(2)} KB
-                    </p>
+                <div className="space-y-4 mt-4">
+                  <div>
+                    <p className="text-sm mb-2">File selected:</p>
+                    <div className="bg-muted p-3 rounded-lg break-all">
+                      <p className="font-semibold text-foreground">{pendingFile.name}</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Size: {(pendingFile.size / 1024).toFixed(2)} KB
+                      </p>
+                    </div>
                   </div>
-                  <p>Do you want to proceed?</p>
+                  
+                  <div>
+                    <label className="text-sm font-medium text-foreground">
+                      Property Address *
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g., 123 Main Street, London"
+                      value={fileAddress}
+                      onChange={(e) => setFileAddress(e.target.value)}
+                      className="w-full mt-1 px-3 py-2 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                    />
+                  </div>
+
+                  {error && (
+                    <p className="text-sm text-red-500">⚠️ {error}</p>
+                  )}
                 </div>
               )}
             </DialogDescription>
@@ -170,15 +246,18 @@ export function Hero() {
           <DialogFooter className="flex gap-2 justify-end">
             <button
               onClick={handleDeclineUpload}
-              className="px-4 py-2 rounded-lg border border-border hover:bg-muted transition-colors"
+              disabled={isUploading}
+              className="px-4 py-2 rounded-lg border border-border hover:bg-muted transition-colors disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               onClick={handleConfirmUpload}
-              className="px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+              disabled={isUploading || !fileAddress.trim()}
+              className="px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center gap-2"
             >
-              Confirm
+              {isUploading && <Loader2 className="w-4 h-4 animate-spin" />}
+              {isUploading ? "Uploading..." : "Confirm"}
             </button>
           </DialogFooter>
         </DialogContent>

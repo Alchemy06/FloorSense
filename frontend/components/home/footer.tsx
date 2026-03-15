@@ -1,8 +1,11 @@
 "use client"
 
+import { useState } from "react"
 import GameButton from "@/components/ui/game-button"
+import { GetStartedDialog } from "@/components/home/get-started-dialog"
 
 export function Footer() {
+  const [getStartedOpen, setGetStartedOpen] = useState(false)
   return (
     <footer className="w-full border-t border-border bg-background">
       <div className="max-w-5xl mx-auto px-6 py-16">
@@ -71,7 +74,9 @@ export function Footer() {
           <div className="col-span-1 md:col-span-1 space-y-4">
             <h4 className="font-semibold text-sm">Get started</h4>
             <p className="text-sm text-muted-foreground">Analyze your first property today.</p>
-            <GameButton className="w-full" size="sm">Sign up</GameButton>
+            <GameButton className="w-full" size="sm" onClick={() => setGetStartedOpen(true)}>
+              Tips & Guides
+            </GameButton>
           </div>
         </div>
 
@@ -88,6 +93,9 @@ export function Footer() {
           </div>
         </div>
       </div>
+
+      {/* Get Started Dialog */}
+      <GetStartedDialog open={getStartedOpen} onOpenChange={setGetStartedOpen} />
     </footer>
   )
 }

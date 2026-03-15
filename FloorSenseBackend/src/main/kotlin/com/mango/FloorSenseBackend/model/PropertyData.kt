@@ -19,7 +19,8 @@ data class PropertyData(
     var status: String = "pending",
     var tacticalAnalysis: TacticalAnalysis? = null,
     var neuroAnalysis: NeuroAnalysis? = null,
-    var propertyAnalysis: PropertyAnalysis? = null
+    var propertyAnalysis: PropertyAnalysis? = null,
+    var tacticalZestimate: Double? = null
 )
 
 data class ScraperRequest(val url: String)
