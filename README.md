@@ -40,8 +40,16 @@ First, you'll need a MongoDB cluster. Create a `.env` file in both your `backend
 **Backend `.env`:**
 ```text
 PORT=80
+
 MONGODB_URI=mongodb+srv://<username>:<password>@cluster.mongodb.net/floorsense
+
 ANTHROPIC_API_KEY=your_claude_key
+
 ELEVENLABS_API_KEY=your_elevenlabs_key
+```
 
 **Team Members:**
+Adarash Ram Sivakumar
+Adit Sharma
+Sai Raghav Commandur
+Ervin 
