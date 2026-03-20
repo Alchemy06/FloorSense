@@ -1,0 +1,38 @@
+services:
+  playwright-mcp:
+    build:
+      context: ./playwright-mcp
+    ports:
+      - "3001:3000" # Changed host port to 3001 to avoid conflict with frontend
+    environment:
+      - PORT=3000
+    restart: unless-stopped
+
+  # 2. The API Server (Kotlin)
+  kotlin-backend:
+    build:
+      context: ./FloorSenseBackend
+    ports:
+      - "8080:8080"
+    environment:
+      - MONGO_URI=${MONGO_URI}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - CLAUDE_API_KEY=${CLAUDE_API_KEY}
+      - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY}
+      - MCP_URL=http://playwright-mcp:3000
+      - ELEVENLABS_VOICE_ID=${ELEVENLABS_VOICE_ID}
+    depends_on:
+      - playwright-mcp
+    restart: unless-stopped
+
+  # 3. The React/Next.js Frontend
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8080
+    depends_on:
+      - kotlin-backend
+    restart: unless-stopped
