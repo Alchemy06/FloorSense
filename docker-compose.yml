@@ -20,6 +20,7 @@ services:
     restart: unless-stopped
 
   # 3. The API Server (Kotlin)
+  kotlin-backend:
     build:
       context: ./FloorSenseBackend
     ports:
