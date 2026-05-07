@@ -4,12 +4,12 @@ spring:
 
   data:
     mongodb:
-      uri: ${SPRING_DATA_MONGODB_URI:mongodb://mongodb:27017/floorsense}
+      uri: ${MONGODB_URI:mongodb://mongodb:27017/floorsense}
 
   ai:
     google:
       genai:
-        api-key: ${SPRING_AI_GOOGLE_GENAI_API_KEY}
+        api-key: ${GEMINI_API_KEY}
         project-id: floorsense
         location: us-central1
         chat:

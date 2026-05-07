@@ -7,7 +7,7 @@ import { generateAudioNarrative } from '../services/texToSpeech.js'
 const router = express.Router()
 
 // Configuration for Playwright service
-const PLAYWRIGHT_SERVICE_URL = process.env.PLAYWRIGHT_SERVICE_URL || 'http://***REMOVED***:3000'
+const PLAYWRIGHT_SERVICE_URL = process.env.PLAYWRIGHT_SERVICE_URL || 'http://playwright-mcp:3000'
 
 // POST - Submit a Rightmove URL for analysis
 router.post('/from-url', async (req, res) => {
