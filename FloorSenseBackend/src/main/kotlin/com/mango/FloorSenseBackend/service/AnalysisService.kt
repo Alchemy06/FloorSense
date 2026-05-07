@@ -22,7 +22,7 @@ class AnalysisService(
 ) {
     private val httpClient = HttpClient.newHttpClient()
     private val objectMapper = ObjectMapper()
-    private val scraperUrl = "http://***REMOVED***:3000/get-floorplan"
+    private val scraperUrl = "http://playwright-mcp:3000/get-floorplan"
 
     fun findAll(): List<PropertyData> = propertyRepository.findAll()
 
